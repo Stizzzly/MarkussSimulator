@@ -213,19 +213,19 @@ while running:
             if event.type == pygame.QUIT:
                 save_click_count(click_count, bonus_claimed)  # Сохраняем состояние при выходе
                 running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN:
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if (mouse_pos[0] - circle_center[0]) ** 2 + (mouse_pos[1] - circle_center[1]) ** 2 < circle_radius ** 2:
                     click_count += 1
-                elif button_rect_1.collidepoint(mouse_pos):
+                elif button_rect_1.collidepoint(mouse_pos) and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     showing_screamer = True
-                elif button_rect_2.collidepoint(mouse_pos):
+                elif button_rect_2.collidepoint(mouse_pos) and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     if not bonus_claimed:
                         webbrowser.open("https://app.getgrass.io/register?referralCode=2AmEBXJTXIEg-gh")
                         click_count += 1000
                         bonus_claimed = True  # Устанавливаем флаг, что бонус получен
                         save_click_count(click_count, bonus_claimed)  # Сохраняем данные
                         showing_modal = True
-                elif empty_card_rect.collidepoint(mouse_pos):
+                elif empty_card_rect.collidepoint(mouse_pos) and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     showing_shop = True
 
     if showing_screamer:
