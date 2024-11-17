@@ -3,9 +3,12 @@ import sys
 import os
 import webbrowser
 import json
+import platform
+import time
+import random  # Импортируем модуль для работы с случайными величинами
 
 
-# Функция для определения пути к ресурсам
+# Функции загрузки и сохранения состояния
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -14,85 +17,123 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 
-# Функции для сохранения и загрузки click_count
-def save_click_count(count, bonus_claimed):
-    user_name = os.getlogin()  # Получаем имя пользователя
-    folder_path = f"C:\\Users\\{user_name}\\AppData\\Local\\STIZZLY\\MarkussSimulator"
+def detect_os():
+    os_name = platform.system()
+    if os_name == "Linux":
+        return "Linux"
+    elif os_name == "Windows":
+        return "Windows"
+    else:
+        return "Unknown"
+        print("Операционная система не определена, сохранение невозможно, свяжитесь с разработчиком")
+
+
+def get_save_path():
+    os_type = detect_os()
+    print(f"Операционная система: {os_type}")
+
+    if os_type == "Linux":
+        return os.path.expanduser("~/.MarkussSimulator/click_count.json")
+    elif os_type == "Windows":
+        user_name = os.getlogin()
+        return f"C:\\Users\\{user_name}\\AppData\\Local\\STIZZLY\\MarkussSimulator\\click_count.json"
+    else:
+        raise Exception("Неизвестная операционная система. Сохранение невозможно.")
+
+
+def load_click_count():
+    save_path = get_save_path()
+    folder_path = os.path.dirname(save_path)
+
+    if folder_path and not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
+    if os.path.exists(save_path):
+        try:
+            with open(save_path, "r") as file:
+                data = json.load(file)
+                return data.get("click_count", 0), data.get("bonus_claimed", False), data.get("mezpils_buy", False)
+        except (json.JSONDecodeError, IOError):
+            print("Ошибка чтения файла. Используются значения по умолчанию.")
+
+    print("Файл не найден. Используются значения по умолчанию.")
+    return 0, False, False
+
+
+def save_click_count(click_count, bonus_claimed, mezpils_buy):
+    save_path = get_save_path()
+    folder_path = os.path.dirname(save_path)
 
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
 
-    file_path = os.path.join(folder_path, "click_count.json")
+    data = {
+        "click_count": click_count,
+        "bonus_claimed": bonus_claimed,
+        "mezpils_buy": mezpils_buy
+    }
 
-    with open(file_path, "w") as file:
-        json.dump({"click_count": count, "bonus_claimed": bonus_claimed}, file)
-
-
-def load_click_count():
-    user_name = os.getlogin()  # Получаем имя пользователя
-    folder_path = f"C:\\Users\\{user_name}\\AppData\\Local\\STIZZLY\\MarkussSimulator"
-    file_path = os.path.join(folder_path, "click_count.json")
-
-    if os.path.exists(file_path):
-        with open(file_path, "r") as file:
-            data = json.load(file)
-            return data.get("click_count", 0), data.get("bonus_claimed", False)
-    return 0, False
+    try:
+        with open(save_path, "w") as file:
+            json.dump(data, file)
+        print(f"Данные сохранены: {data}")
+        print(f"Данные сохранены в файл: {save_path}")
+    except IOError as e:
+        print(f"Ошибка записи файла: {e}")
 
 
-# Инициализация Pygame
 pygame.init()
+if detect_os() in ["Windows", "Linux"]:
+    WIDTH, HEIGHT = 700, 500
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Markuss Simulator")
+elif detect_os() in ["Android"]:
+    WIDTH, HEIGHT = 360, 640
+    screen = pygame.display.set_mode((HEIGHT, WIDTH), pygame.FULLSCREEN)
 
-# Задание размеров окна
-WIDTH, HEIGHT = 700, 500
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Markuss Simulator")
 
-# Цвета
+def draw_rotated_surface(surface):
+    rotated_surface = pygame.transform.rotate(surface, -90)
+    return rotated_surface
+
+
 WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 BUTTON_COLOR = (200, 0, 0)
 BUTTON_HOVER_COLOR = (255, 0, 0)
 CIRCLE_COLOR = (255, 0, 0)
 OUTLINE_COLOR = (255, 0, 0)
 
-# Параметры кнопок
 button_text_1 = "дахуя бан накидал"
 button_text_2 = "помогите криптопиздюку максиму"
 button_font = pygame.font.SysFont(None, 26)
 
-# Первая и вторая кнопки (справа)
 button_rect_1 = pygame.Rect(WIDTH - 400, HEIGHT // 2 - 100, 300, 80)
 button_rect_2 = pygame.Rect(WIDTH - 400, HEIGHT // 2 + 20, 300, 80)
 
-# Круглая кнопка слева с изображением
 circle_center = (150, HEIGHT // 2)
 circle_radius = 75
 outline_radius = circle_radius + 15
-click_count, bonus_claimed = load_click_count()  # Загружаем значение и состояние бонуса из файла
+click_count, bonus_claimed, mezpils_buy = load_click_count()
 
-# Загрузка изображений
 markus_image_path = resource_path("markuss.png")
 markus_image = pygame.image.load(markus_image_path)
 markus_image = pygame.transform.scale(markus_image, (circle_radius * 2, circle_radius * 2))
 
-# Иконка empty_card для верхнего правого угла
 empty_card_path = resource_path("empty_cart.png")
 empty_card_image = pygame.image.load(empty_card_path)
 empty_card_image = pygame.transform.scale(empty_card_image, (70, 50))
 empty_card_rect = empty_card_image.get_rect(topright=(WIDTH - 10, 10))
 
-# Создание круглой маски
 mask = pygame.Surface((circle_radius * 2, circle_radius * 2), pygame.SRCALPHA)
 pygame.draw.circle(mask, (255, 255, 255, 255), (circle_radius, circle_radius), circle_radius)
 markus_image.set_colorkey((0, 0, 0))
 markus_image.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
 
-# Текст для окна
 modal_text = "Вы помогли заработать криптопиздюку максиму целых 0.00000001 евро, он вам отсыпал долю в виде 1000 маркус коинов"
 modal_title = "Помощь от криптопиздюка"
 
 
-# Функция для разбивки текста на несколько строк, чтобы он не выходил за пределы окна
 def wrap_text(text, font, width):
     words = text.split(' ')
     lines = []
@@ -107,7 +148,6 @@ def wrap_text(text, font, width):
     return lines
 
 
-# Функция для отображения модального окна
 def show_modal(message, title):
     font = pygame.font.SysFont(None, 30)
     title_text = font.render(title, True, WHITE)
@@ -140,32 +180,110 @@ def show_modal(message, title):
     return False
 
 
-# Функция для отображения интерфейса магазина
-def show_shop():
-    font = pygame.font.SysFont(None, 36)
-    shop_text = font.render("Магазин Маркус коинов", True, WHITE)
+# Глобальные переменные для времени отображения сообщений
+purchase_time = None
+purchase_message = ""
+last_wallet_click_time = None
 
-    # Фон магазина
-    pygame.draw.rect(screen, (50, 50, 50), (50, 50, WIDTH - 100, HEIGHT - 100))
-    screen.blit(shop_text, (WIDTH // 2 - shop_text.get_width() // 2, 100))
 
-    # Добавим кнопку выхода из магазина
-    exit_button_rect = pygame.Rect(WIDTH // 2 - 50, HEIGHT - 80, 100, 40)
+def show_shop(click_count, events):
+    global purchase_time, purchase_message, mezpils_buy, last_wallet_click_time
+
+    wallet_image_path = resource_path("wallet.png")
+    wallet_image = pygame.image.load(wallet_image_path)
+    wallet_image = pygame.transform.scale(wallet_image, (70, 50))
+
+    mezpils_image_path = resource_path("mezpils.png")
+    mezpils_image = pygame.image.load(mezpils_image_path)
+    mezpils_image = pygame.transform.scale(mezpils_image, (WIDTH // 3 - 50, HEIGHT // 3 - 10))
+
+    font = pygame.font.SysFont(None, 50)
+    exit_button_font = pygame.font.SysFont(None, 36)
+    item_font = pygame.font.SysFont(None, 36)
+    description_font = pygame.font.SysFont(None, 25)
+    shop_text = font.render("Магазин Маркуса", True, BLACK)
+
+    screen.blit(shop_text, (WIDTH // 2 - shop_text.get_width() // 2, 20))
+    screen.blit(mezpils_image, (WIDTH // 4 - 125, HEIGHT // 3 - 50))
+
+    item_name = item_font.render("Mežpils", True, BLACK)
+    item_description = description_font.render("0.5 промилле", True, BLACK)
+    item_price = item_font.render("Цена: 100 МК", True, BLACK)
+
+    screen.blit(item_name, (WIDTH // 4 - 90, HEIGHT // 3 - 50 + mezpils_image.get_height() + 10))
+    screen.blit(item_description,
+                (WIDTH // 4 - 100, HEIGHT // 3 - 20 + mezpils_image.get_height() + item_name.get_height() + 10))
+    screen.blit(item_price, (WIDTH // 4 - 120,
+                             HEIGHT // 3 - 1 + mezpils_image.get_height() + item_name.get_height() + item_description.get_height() + 20))
+
+    button_width = 150
+    button_height = 40
+    buy_button_rect = pygame.Rect(WIDTH // 4 - 110,
+                                  HEIGHT // 3 - 1 + mezpils_image.get_height() + item_name.get_height() + item_description.get_height() + item_price.get_height() + 30,
+                                  button_width, button_height)
+
+    buy_button_color = BUTTON_HOVER_COLOR if buy_button_rect.collidepoint(pygame.mouse.get_pos()) else BUTTON_COLOR
+
+    if mezpils_buy == False:
+        pygame.draw.rect(screen, BUTTON_COLOR, buy_button_rect)
+        pygame.draw.rect(screen, buy_button_color, buy_button_rect)
+        buy_text = item_font.render("Купить", True, WHITE)
+        screen.blit(buy_text, (
+            buy_button_rect.centerx - buy_text.get_width() // 2, buy_button_rect.centery - buy_text.get_height() // 2))
+    elif mezpils_buy == True:
+        pygame.draw.rect(screen, BUTTON_COLOR, buy_button_rect)
+        pygame.draw.rect(screen, buy_button_color, buy_button_rect)
+        buy_text = item_font.render("Куплено", True, WHITE)
+        screen.blit(buy_text, (
+            buy_button_rect.centerx - buy_text.get_width() // 2, buy_button_rect.centery - buy_text.get_height() // 2))
+
+    wallet_rect = pygame.Rect(10, 10, wallet_image.get_width(), wallet_image.get_height())
+    screen.blit(wallet_image, wallet_rect.topleft)
+
+    exit_button_rect = pygame.Rect(WIDTH - 100 - 20, HEIGHT - 40 - 20, 100, 40)
     pygame.draw.rect(screen, BUTTON_COLOR, exit_button_rect)
-    exit_text = font.render("Назад", True, WHITE)
-    screen.blit(exit_text, (exit_button_rect.centerx - exit_text.get_width() // 2,
-                            exit_button_rect.centery - exit_text.get_height() // 2))
+    exit_text = exit_button_font.render("Назад", True, WHITE)
+    screen.blit(exit_text, (
+        exit_button_rect.centerx - exit_text.get_width() // 2, exit_button_rect.centery - exit_text.get_height() // 2))
 
-    return exit_button_rect
+    for event in events:
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            mouse_pos = pygame.mouse.get_pos()
+            if wallet_rect.collidepoint(mouse_pos):
+                last_wallet_click_time = time.time()
+            elif buy_button_rect.collidepoint(mouse_pos) and not mezpils_buy:
+                if click_count >= 100:
+                    click_count -= 100
+                    mezpils_buy = True
+                    save_click_count(click_count, bonus_claimed, mezpils_buy)
+                    purchase_message = "Вы купили Mežpils!"
+                    purchase_time = time.time()
+                else:
+                    purchase_message = "У вас недостаточно денег!"
+                    purchase_time = time.time()
+            elif exit_button_rect.collidepoint(mouse_pos):
+                return exit_button_rect, click_count
+
+    if purchase_message and time.time() - purchase_time <= 5:
+        message_text = font.render(purchase_message, True, WHITE)
+        message_rect = message_text.get_rect(center=(WIDTH // 2, HEIGHT // 5))
+        pygame.draw.rect(screen, (0, 0, 0), message_rect.inflate(20, 20))
+        screen.blit(message_text, message_rect.topleft)
+
+    if last_wallet_click_time and time.time() - last_wallet_click_time <= 5:
+        counter_text = font.render(f"У тебя есть: {click_count} МК", True, WHITE)
+        counter_rect = counter_text.get_rect(center=(WIDTH // 2, HEIGHT // 5))
+        pygame.draw.rect(screen, (0, 0, 0), counter_rect.inflate(20, 20))
+        screen.blit(counter_text, counter_rect.topleft)
+
+    return exit_button_rect, click_count
 
 
-# Загрузка изображения для скримера
-screamer_image_path = resource_path("skrimer.png")
-screamer_image = pygame.image.load(screamer_image_path)
-screamer_image = pygame.transform.scale(screamer_image, (WIDTH, HEIGHT))
+screamer_images = ["skrimer.png", "sasha.png", "markus.png"]
 
-# Основной цикл игры
 running = True
+rotated_screen = draw_rotated_surface(screen)
+pygame.display.flip()
 showing_modal = False
 showing_screamer = False
 showing_shop = False
@@ -175,33 +293,32 @@ while running:
     mouse_pos = pygame.mouse.get_pos()
 
     if showing_shop:
-        exit_button_rect = show_shop()
-        for event in pygame.event.get():
+        events = pygame.event.get()
+        exit_button_rect, click_count = show_shop(click_count, events)
+
+        for event in events:
             if event.type == pygame.QUIT:
-                save_click_count(click_count, bonus_claimed)  # Сохраняем состояние при выходе
+                save_click_count(click_count, bonus_claimed, mezpils_buy)
                 running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if exit_button_rect.collidepoint(mouse_pos):
-                    showing_shop = False
+            elif event.type == pygame.MOUSEBUTTONDOWN and exit_button_rect.collidepoint(mouse_pos):
+                showing_shop = False
     else:
+        events = pygame.event.get()
         pygame.draw.circle(screen, OUTLINE_COLOR, circle_center, outline_radius)
         pygame.draw.circle(screen, CIRCLE_COLOR, circle_center, circle_radius)
         screen.blit(markus_image, (circle_center[0] - circle_radius, circle_center[1] - circle_radius))
 
-        # Отображение иконки в верхнем правом углу
         screen.blit(empty_card_image, empty_card_rect)
 
         counter_text = button_font.render(f"Маркус коины: {click_count}", True, BUTTON_COLOR)
         screen.blit(counter_text, (10, 10))
 
-        # Кнопка 1 (не меняется)
         pygame.draw.rect(screen, BUTTON_HOVER_COLOR if button_rect_1.collidepoint(mouse_pos) else BUTTON_COLOR,
                          button_rect_1)
         text_surface_1 = button_font.render(button_text_1, True, WHITE)
         text_rect_1 = text_surface_1.get_rect(center=button_rect_1.center)
         screen.blit(text_surface_1, text_rect_1)
 
-        # Кнопка 2 (меняется текст, если бонус получен)
         button_text_2_display = button_text_2 if not bonus_claimed else "Ты помог криптопиздюку максу"
         pygame.draw.rect(screen, BUTTON_HOVER_COLOR if button_rect_2.collidepoint(mouse_pos) else BUTTON_COLOR,
                          button_rect_2)
@@ -209,23 +326,30 @@ while running:
         text_rect_2 = text_surface_2.get_rect(center=button_rect_2.center)
         screen.blit(text_surface_2, text_rect_2)
 
-        for event in pygame.event.get():
+        for event in events:
             if event.type == pygame.QUIT:
-                save_click_count(click_count, bonus_claimed)  # Сохраняем состояние при выходе
+                save_click_count(click_count, bonus_claimed, mezpils_buy)
                 running = False
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if (mouse_pos[0] - circle_center[0]) ** 2 + (mouse_pos[1] - circle_center[1]) ** 2 < circle_radius ** 2:
-                    click_count += 1
-                elif button_rect_1.collidepoint(mouse_pos) and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    if mezpils_buy:
+                        click_count += 2
+                    else:
+                        click_count += 1
+                    save_click_count(click_count, bonus_claimed, mezpils_buy)
+                elif button_rect_1.collidepoint(mouse_pos):
+                    chosen_image_path = resource_path(random.choice(screamer_images))
+                    screamer_image = pygame.image.load(chosen_image_path)
+                    screamer_image = pygame.transform.scale(screamer_image, (WIDTH, HEIGHT))
                     showing_screamer = True
-                elif button_rect_2.collidepoint(mouse_pos) and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                elif button_rect_2.collidepoint(mouse_pos):
                     if not bonus_claimed:
                         webbrowser.open("https://app.getgrass.io/register?referralCode=2AmEBXJTXIEg-gh")
                         click_count += 1000
-                        bonus_claimed = True  # Устанавливаем флаг, что бонус получен
-                        save_click_count(click_count, bonus_claimed)  # Сохраняем данные
+                        bonus_claimed = True
+                        save_click_count(click_count, bonus_claimed, mezpils_buy)
                         showing_modal = True
-                elif empty_card_rect.collidepoint(mouse_pos) and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                elif empty_card_rect.collidepoint(mouse_pos):
                     showing_shop = True
 
     if showing_screamer:
@@ -238,5 +362,3 @@ while running:
         showing_modal = False
 
     pygame.display.update()
-
-pygame.quit()
